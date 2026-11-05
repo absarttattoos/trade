@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Zerodha Trading Journal</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#f6f7f9;--card:#fff;--tx:#14171c;--mu:#6a7280;--bd:#e3e6ea;--gr:#0a8f4e;--rd:#d23b3b;--ac:#2f5bea}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1216;--card:#181c22;--tx:#e8eaed;--mu:#8d96a3;--bd:#2a3039;--gr:#3fcf85;--rd:#ff6b6b;--ac:#7c9cff}}
+:root[data-theme="dark"]{--bg:#0f1216;--card:#181c22;--tx:#e8eaed;--mu:#8d96a3;--bd:#2a3039;--gr:#3fcf85;--rd:#ff6b6b;--ac:#7c9cff}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:1000px;margin:0 auto;padding:16px 16px 40px}
+h1{font-size:21px;margin:0}h2{font-size:15px;margin:14px 0 8px}
+.top{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:12px}
+.btn{background:var(--ac);color:#fff;border:0;border-radius:8px;padding:8px 14px;font-size:14px;cursor:pointer;display:inline-block}
+.btn.s{background:transparent;color:var(--tx);border:1px solid var(--bd)}
+.row{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.k{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:10px}
+.k b{display:block;font-size:18px;margin-top:2px}.k span{color:var(--mu);font-size:12px}
+.g{color:var(--gr)}.r{color:var(--rd)}.note{color:var(--mu);font-size:12px;margin-top:6px}
+.sc{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:7px 8px;text-align:right;border-bottom:1px solid var(--bd);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}th{color:var(--mu);font-weight:600}
+tr.c{cursor:pointer}tr.c:hover{background:var(--bg)}
+input[type=number],select{background:var(--bg);color:var(--tx);border:1px solid var(--bd);border-radius:6px;padding:5px;width:80px}
+select{width:auto}svg{width:100%;height:auto;display:block}
+</style></head><body><main>
+<div class="top"><h1>Zerodha Trading Journal</h1><div class="row"><button class="btn s" onclick="go('home')">Journal</button><button class="btn s" onclick="go('settings')">Settings</button></div></div>
+<div id="v"></div>
+</main>
+<script>
+const D0={eqI:{n:'Equity intraday',brk:20,brkp:.03,sttB:0,sttS:.025,txn:.00307,stamp:.003,sebi:.0001,gst:18},
+eqD:{n:'Equity delivery',brk:0,brkp:0,sttB:.1,sttS:.1,txn:.00307,stamp:.015,sebi:.0001,gst:18},
+fut:{n:'Futures',brk:20,brkp:.03,sttB:0,sttS:.05,txn:.00183,stamp:.002,sebi:.0001,gst:18},
+opt:{n:'Options (NSE)',brk:20,brkp:0,sttB:0,sttS:.15,txn:.03553,stamp:.003,sebi:.0001,gst:18},
+optB:{n:'Options (BSE: Sensex/Bankex)',brk:20,brkp:0,sttB:0,sttS:.15,txn:.0325,stamp:.003,sebi:.0001,gst:18}};
+const F=[['brk','Brk cap ₹'],['brkp','Brk %'],['sttB','STT buy %'],['sttS','STT sell %'],['txn','Exch %'],['stamp','Stamp buy %'],['sebi','SEBI %'],['gst','GST %']];
+let D=JSON.parse(JSON.stringify(D0)),S={eq:'eqI',risk:0},rows=[],view='home',msg='';
+const ld=(k,d)=>{try{const s=localStorage.getItem(k);return s?JSON.parse(s):d}catch(e){return d}};
+const sv=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+D=ld('zcfg3',D);S=ld('zset',S);rows=ld('zrows',[]);
+const inr=n=>(n<0?'-':'')+'₹'+Math.abs(n).toLocaleString('en-IN',{maximumFractionDigits:2,minimumFractionDigits:2});
+const cl=n=>n>0?'g':n<0?'r':'';const k=(a,b,c)=>'<div class="k"><span>'+a+'</span><b class="'+(c||'')+'">'+b+'</b></div>';
+function split(l){const o=[];let c='',q=false;for(const ch of l){if(ch=='"')q=!q;else if(ch==','&&!q){o.push(c);c=''}else c+=ch}o.push(c);return o.map(s=>s.trim())}
+const AL={symbol:['symbol','instrument','tradingsymbol'],ty:['trade_type','type','transaction_type'],q:['quantity','qty','qty.'],p:['price','avg._price','avg_price','average_price'],d:['trade_date','date','time'],oid:['order_id','orderid'],t:['order_execution_time','time','exchange_timestamp'],seg:['segment'],status:['status'],pr:['product']};
+function parse(t){const L=t.replace(/^\uFEFF/,'').split(/\r?\n/).filter(x=>x.trim());
+const hi=L.findIndex(l=>/symbol|instrument/i.test(l)&&/qty|quantity/i.test(l));if(hi<0)return[];
+const h=split(L[hi]).map(x=>x.toLowerCase().replace(/\s+/g,'_'));
+const g=(o,a)=>{for(const x of AL[a]){if(o[x]!==undefined&&o[x]!=='')return o[x]}return''};
+return L.slice(hi+1).map(l=>{const v=split(l),o={};h.forEach((c,j)=>o[c]=v[j]);const ty=String(g(o,'ty')).toLowerCase(),tm=String(g(o,'t')||g(o,'d')).replace('T',' ');
+return{sym:g(o,'symbol'),seg:String(g(o,'seg')).toUpperCase(),time:tm,date:tm.slice(0,10),side:ty.startsWith('b')?'buy':'sell',ok:/^(b|s)/.test(ty),
+q:+String(g(o,'q')).split('/')[0].replace(/,/g,''),p:+String(g(o,'p')).replace(/,/g,''),st:String(g(o,'status')||'COMPLETE'),pr:String(g(o,'pr')).toUpperCase(),oid:g(o,'oid')}})
+.filter(r=>r.sym&&r.ok&&r.time).map(({ok,...r})=>r)}
+const key=r=>[r.time,r.sym,r.side,r.q,r.p,r.st,r.oid].join('|');
+document.addEventListener('change',e=>{if(e.target.id=='imp'){importData(e.target.files[0]);e.target.value='';return}if(e.target.id!='f')return;const f=e.target.files[0];if(!f)return;
+const rd=new FileReader();rd.onload=()=>{const n=parse(rd.result);if(!n.length){msg='<span class="r">No orders found. Needs a CSV with Time, Type, Instrument, Qty. and Avg. price columns (or Console tradebook columns). First line: '+String(rd.result).split(/\r?\n/)[0].slice(0,150).replace(/</g,'&lt;')+'</span>';render();return}
+const have=new Set(rows.map(key));let add=0;n.forEach(r=>{if(!have.has(key(r))){rows.push(r);have.add(key(r));add++}});
+sv('zrows',rows);msg='Added '+add+' new orders, skipped '+(n.length-add)+' duplicates.';render()};rd.readAsText(f);e.target.value=''});
+function ftype(r){if(/(CE|PE)$/.test(r.sym)&&r.seg!='EQ'&&/\d/.test(r.sym))return/^(SENSEX|BANKEX)/.test(r.sym)?'optB':'opt';
+if(/FUT$/.test(r.sym)||r.seg=='FO'||r.seg=='NFO')return'fut';return r.pr=='CNC'?'eqD':r.pr=='MIS'?'eqI':S.eq}
+function calc(){const fills=rows.filter(r=>r.q>0&&r.p>0).map(r=>({...r,t:ftype(r),v:r.q*r.p})).sort((a,b)=>a.time<b.time?-1:a.time>b.time?1:0);
+const ord={};fills.forEach(f=>{f.k=f.oid||key(f);ord[f.k+f.t]=(ord[f.k+f.t]||0)+f.v});
+fills.forEach(f=>{const c=D[f.t],ov=ord[f.k+f.t],ob=c.brkp>0?Math.min(c.brk,ov*c.brkp/100):c.brk;
+f.brk=ob*f.v/ov;f.stt=f.v*(f.side=='buy'?c.sttB:c.sttS)/100;f.txn=f.v*c.txn/100;f.sebi=f.v*c.sebi/100;f.stamp=f.side=='buy'?f.v*c.stamp/100:0;
+f.gst=(f.brk+f.txn+f.sebi)*c.gst/100;f.ch=f.brk+f.stt+f.txn+f.sebi+f.stamp+f.gst});
+const pos={},trades=[];
+for(const f of fills){const s=pos[f.sym]||(pos[f.sym]={lots:[],cur:null});
+if(!s.cur)s.cur={sym:f.sym,et:f.time,gross:0,ch:0,brk:0,eq:0,ev:0,xq:0,xv:0,dir:f.side=='buy'?'LONG':'SHORT'};
+const c=s.cur;c.ch+=f.ch;c.brk+=f.brk;const sg=f.side=='buy'?1:-1;let q=f.q;
+while(q>0&&s.lots.length&&s.lots[0].sg!=sg){const l=s.lots[0],m=Math.min(q,l.q);c.gross+=l.sg*(f.p-l.p)*m;c.xq+=m;c.xv+=f.p*m;l.q-=m;q-=m;if(!l.q)s.lots.shift()}
+if(q>0){s.lots.push({sg,q,p:f.p});c.eq+=q;c.ev+=q*f.p}
+c.date=f.date;c.xt=f.time;if(!s.lots.length){c.net=c.gross-c.ch;trades.push(c);s.cur=null}}
+trades.forEach(c=>{c.entry=c.ev/c.eq;c.exit=c.xv/c.xq;c.bias=/CE$/.test(c.sym)?'LONG':/PE$/.test(c.sym)?'SHORT':c.dir});
+trades.sort((a,b)=>a.xt<b.xt?-1:1);return trades}
+function stats(a){const tot=x=>x.reduce((s,y)=>s+y,0),av=x=>x.length?tot(x)/x.length:0,n=t=>t.net;
+const W=a.filter(t=>t.net>0),Ls=a.filter(t=>t.net<0),net=tot(a.map(n)),aw=av(W.map(n)),al=av(Ls.map(n)),lt=tot(Ls.map(n));
+let cum=0,pk=0,mdd=0,cs=0,mcs=0;const eq=[0],dd=[0];
+a.forEach(t=>{cum+=t.net;eq.push(cum);pk=Math.max(pk,cum);dd.push(cum-pk);mdd=Math.min(mdd,cum-pk);t.net<0?(cs++,mcs=Math.max(mcs,cs)):cs=0});
+return{n:a.length,W:W.length,L:Ls.length,net,gross:tot(a.map(t=>t.gross)),ch:tot(a.map(t=>t.ch)),brk:tot(a.map(t=>t.brk)),wr:a.length?W.length/a.length*100:0,aw,al,rr:al?aw/Math.abs(al):0,pf:lt?tot(W.map(n))/Math.abs(lt):0,exp:av(a.map(n)),mdd,mcs,eq,dd}}
+function bias(a){if(!a.length)return'';const row=s=>{const x=stats(a.filter(t=>t.bias==s));return'<tr><td>'+s+'</td><td>'+x.n+'</td><td>'+(x.n/a.length*100).toFixed(1)+'%</td><td>'+x.wr.toFixed(0)+'%</td><td>'+inr(x.gross)+'</td><td>'+inr(x.ch)+'</td><td class="'+cl(x.net)+'">'+inr(x.net)+'</td><td>'+inr(x.exp)+'</td></tr>'};
+return'<div class="card" style="margin-top:12px"><h2 style="margin-top:0">Long vs Short</h2><div class="sc"><table><tr><th>Side</th><th>Trades</th><th>% of trades</th><th>Win rate</th><th>Gross</th><th>Charges</th><th>Net P&L</th><th>Avg / trade</th></tr>'+row('LONG')+row('SHORT')+'</table></div><div class="note">CE trades are counted as long and PE trades as short. Equity and futures use their actual direction.</div></div>'}
+function chart(a,d){const w=700,h=200,p=30,mn=Math.min(...a,...d),mx=Math.max(...a,0),r=(mx-mn)||1,n=Math.max(a.length-1,1);
+const X=i=>p+i*(w-2*p)/n,Y=v=>h-p-(v-mn)/r*(h-2*p),pl=s=>s.map((v,i)=>X(i)+','+Y(v)).join(' ');
+return'<svg viewBox="0 0 '+w+' '+h+'"><line x1="'+p+'" x2="'+(w-p)+'" y1="'+Y(0)+'" y2="'+Y(0)+'" stroke="var(--bd)"/><polyline fill="none" stroke="var(--ac)" stroke-width="2" points="'+pl(a)+'"/><polyline fill="none" stroke="var(--rd)" stroke-width="1.5" stroke-dasharray="4 3" points="'+pl(d)+'"/><text x="'+p+'" y="14" fill="var(--mu)" font-size="11">Blue: cumulative net · Red dashed: drawdown</text></svg>'}
+async function exportData(){const data=JSON.stringify({v:1,rows,D,S},null,1),fn='zerodha-journal-backup-'+new Date().toISOString().slice(0,10)+'.json';
+try{const dl=window.claude?await window.claude.use('downloads'):null;
+if(dl)await dl.save({filename:fn,data});else{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type:'application/json'}));a.download=fn;a.click()}
+sv('zlast',Date.now());msg='Backup saved.'}catch(e){msg=e&&e.code=='declined'?'Backup cancelled.':'Could not save the backup.'}render()}
+function importData(f){if(!f)return;const rd=new FileReader();rd.onload=()=>{try{const o=JSON.parse(rd.result);if(!Array.isArray(o.rows))throw 0;const have=new Set(rows.map(key));let add=0;
+o.rows.forEach(r=>{if(r&&r.sym&&r.time&&!have.has(key(r))){rows.push(r);have.add(key(r));add++}});
+if(o.D)D=Object.assign(D,o.D);if(o.S)S=Object.assign(S,o.S);sv('zrows',rows);sv('zcfg3',D);sv('zset',S);msg='Imported: '+add+' new orders added, '+(o.rows.length-add)+' already present.'}catch(e){msg='That file is not a valid backup.'}render()};rd.readAsText(f)}
+function go(v){view=v;msg='';render();window.scrollTo(0,0)}
+function perf(s){return'<div class="grid">'+k('Net P&L',inr(s.net),cl(s.net))+k('Gross P&L',inr(s.gross),cl(s.gross))+k('Brokerage',inr(s.brk))+k('All charges',inr(s.ch),'r')+k('Trades',s.n+' ('+s.W+'W / '+s.L+'L)')+k('Win rate',s.wr.toFixed(1)+'%')+k('Avg win',inr(s.aw),'g')+k('Avg loss',inr(s.al),'r')+k('Avg win : avg loss','1 : '+s.rr.toFixed(2),s.rr>=1?'g':'r')+k('Profit factor',s.pf.toFixed(2))+k('Expectancy / trade',inr(s.exp),cl(s.exp))+k('Max drawdown',inr(s.mdd),'r')+k('Max losing streak',s.mcs)+'</div>'}
+function render(){const v=document.getElementById('v');
+if(view=='settings'){v.innerHTML='<div class="card"><h2 style="margin-top:0">Settings</h2><div class="row"><label>Equity trades without a product type are <select onchange="S.eq=this.value;sv(\'zset\',S)"><option value="eqI"'+(S.eq=='eqI'?' selected':'')+'>Intraday</option><option value="eqD"'+(S.eq=='eqD'?' selected':'')+'>Delivery</option></select></label>'+
+'</div></div>'+
+'<div class="card"><h2 style="margin-top:0">Charges</h2><div class="sc"><table id="cfg"><tr><th>Type</th>'+F.map(x=>'<th>'+x[1]+'</th>').join('')+'</tr>'+Object.keys(D).map(t=>'<tr><td>'+D[t].n+'</td>'+F.map(x=>'<td><input type="number" step="any" value="'+D[t][x[0]]+'" oninput="D[\''+t+'\'][\''+x[0]+'\']=+this.value;sv(\'zcfg3\',D)"></td>').join('')+'</tr>').join('')+'</table></div>'+
+'<div class="note">Brokerage = lower of cap and %, per executed order (options: flat cap, % = 0). GST applies to brokerage + exchange + SEBI. Changes save automatically.</div><p><button class="btn s" onclick="D=JSON.parse(JSON.stringify(D0));sv(\'zcfg3\',D);render()">Reset charges to defaults</button></p></div>'+
+'<div class="card"><h2 style="margin-top:0">Backup</h2><p class="note">'+rows.length+' orders stored in this browser only. '+(ld('zlast',0)?'Last backup: '+new Date(ld('zlast',0)).toLocaleDateString():'Never backed up.')+'</p><div class="row"><button class="btn" onclick="exportData()">Export backup</button><label class="btn s" for="imp">Import backup</label><input id="imp" type="file" accept=".json" style="display:none"></div><p class="note">'+msg+'</p></div><div class="card"><h2 style="margin-top:0">Delete data</h2><button class="btn s" onclick="if(confirm(\'Delete all stored orders?\')){rows=[];sv(\'zrows\',rows);go(\'home\')}">Delete all stored data</button></div>';return}
+const tr=calc(),days={};tr.forEach(t=>(days[t.date]||(days[t.date]=[])).push(t));
+const up='<div class="card row"><label class="btn" for="f">Upload today’s CSV</label><input id="f" type="file" accept=".csv" style="display:none"><span class="note" style="margin:0">'+(msg||'Each upload is merged by date; repeated orders are skipped. Data stays in this browser.')+'</span></div>';
+if(view!='home'&&days[view]){const a=days[view],s=stats(a);
+v.innerHTML='<p><button class="btn s" onclick="go(\'home\')">← All days</button></p><h2 style="margin-top:0">'+view+'</h2>'+perf(s)+'<div class="card" style="margin-top:12px"><h2 style="margin-top:0">Trades</h2><div class="sc"><table><tr><th>Entry time</th><th>Symbol</th><th>Dir</th><th>Qty</th><th>Entry</th><th>Exit</th><th>Gross</th><th>Charges</th><th>Net</th></tr>'+
+a.map(t=>'<tr><td>'+t.et.slice(11)+'</td><td>'+t.sym+'</td><td>'+t.bias+'</td><td>'+t.eq+'</td><td>'+t.entry.toFixed(2)+'</td><td>'+t.exit.toFixed(2)+'</td><td class="'+cl(t.gross)+'">'+inr(t.gross)+'</td><td>'+inr(t.ch)+'</td><td class="'+cl(t.net)+'">'+inr(t.net)+'</td></tr>').join('')+'</table></div>'+
+'<div class="note">CE = long, PE = short.</div></div>'+bias(a);return}
+const s=stats(tr),dk=Object.keys(days).sort().reverse();
+v.innerHTML=up+(tr.length&&Date.now()-ld('zlast',0)>6048e5?'<div class="card note">No backup in the last 7 days. Go to Settings and tap Export backup.</div>':'')+(tr.length?'<h2 style="margin-top:0">Overall</h2>'+perf(s)+'<div class="card" style="margin-top:12px">'+chart(s.eq,s.dd)+'</div>'+bias(tr)+'<div class="card"><h2 style="margin-top:0">Days</h2><div class="sc"><table><tr><th>Date</th><th>Trades</th><th>Win %</th><th>Brokerage</th><th>All charges</th><th>Net P&L</th></tr>'+
+dk.map(d=>{const x=stats(days[d]);return'<tr class="c" onclick="go(\''+d+'\')"><td>'+d+' ›</td><td>'+x.n+'</td><td>'+x.wr.toFixed(0)+'%</td><td>'+inr(x.brk)+'</td><td>'+inr(x.ch)+'</td><td class="'+cl(x.net)+'">'+inr(x.net)+'</td></tr>'}).join('')+'</table></div><div class="note">Tap a date to see every trade of that day.</div></div>':'<div class="card note">No trades yet. Upload your first CSV.</div>')}
+render();
+</script></body></html>
