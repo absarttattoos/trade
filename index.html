@@ -30,16 +30,16 @@ select{width:auto}svg{width:100%;height:auto;display:block}
 <div id="v"></div>
 </main>
 <script>
-const D0={eqI:{n:'Equity intraday',brk:20,brkp:.03,sttB:0,sttS:.025,txn:.00307,stamp:.003,sebi:.0001,gst:18},
-eqD:{n:'Equity delivery',brk:0,brkp:0,sttB:.1,sttS:.1,txn:.00307,stamp:.015,sebi:.0001,gst:18},
-fut:{n:'Futures',brk:20,brkp:.03,sttB:0,sttS:.05,txn:.00183,stamp:.002,sebi:.0001,gst:18},
-opt:{n:'Options (NSE)',brk:20,brkp:0,sttB:0,sttS:.15,txn:.03553,stamp:.003,sebi:.0001,gst:18},
-optB:{n:'Options (BSE: Sensex/Bankex)',brk:20,brkp:0,sttB:0,sttS:.15,txn:.0325,stamp:.003,sebi:.0001,gst:18}};
+const D0={eqI:{n:'Equity intraday',brk:10,brkp:.05,sttB:0,sttS:.025,txn:.00307,stamp:.003,sebi:.0001,gst:18},
+eqD:{n:'Equity delivery',brk:10,brkp:.05,sttB:.1,sttS:.1,txn:.00307,stamp:.015,sebi:.0001,gst:18},
+fut:{n:'Futures',brk:10,brkp:0,sttB:0,sttS:.05,txn:.00183,stamp:.002,sebi:.0001,gst:18},
+opt:{n:'Options (NSE)',brk:10,brkp:0,sttB:0,sttS:.15,txn:.03553,stamp:.003,sebi:.0001,gst:18},
+optB:{n:'Options (BSE: Sensex/Bankex)',brk:10,brkp:0,sttB:0,sttS:.15,txn:.0325,stamp:.003,sebi:.0001,gst:18}};
 const F=[['brk','Brk cap ₹'],['brkp','Brk %'],['sttB','STT buy %'],['sttS','STT sell %'],['txn','Exch %'],['stamp','Stamp buy %'],['sebi','SEBI %'],['gst','GST %']];
 let D=JSON.parse(JSON.stringify(D0)),S={eq:'eqI',risk:0},rows=[],view='home',msg='';
 const ld=(k,d)=>{try{const s=localStorage.getItem(k);return s?JSON.parse(s):d}catch(e){return d}};
 const sv=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
-D=ld('zcfg3',D);S=ld('zset',S);rows=ld('zrows',[]);
+D=ld('zcfg3',D);if(!ld('zsahi',0)){D=JSON.parse(JSON.stringify(D0));sv('zcfg3',D);sv('zsahi',1)}S=ld('zset',S);rows=ld('zrows',[]);
 const inr=n=>(n<0?'-':'')+'₹'+Math.abs(n).toLocaleString('en-IN',{maximumFractionDigits:2,minimumFractionDigits:2});
 const cl=n=>n>0?'g':n<0?'r':'';const k=(a,b,c)=>'<div class="k"><span>'+a+'</span><b class="'+(c||'')+'">'+b+'</b></div>';
 function split(l){const o=[];let c='',q=false;for(const ch of l){if(ch=='"')q=!q;else if(ch==','&&!q){o.push(c);c=''}else c+=ch}o.push(c);return o.map(s=>s.trim())}
@@ -53,7 +53,7 @@ return{sym:g(o,'symbol'),seg:String(g(o,'seg')).toUpperCase(),time:tm,date:tm.sl
 q:+String(g(o,'q')).split('/')[0].replace(/,/g,''),p:+String(g(o,'p')).replace(/,/g,''),st:String(g(o,'status')||'COMPLETE'),pr:String(g(o,'pr')).toUpperCase(),oid:g(o,'oid')}})
 .filter(r=>r.sym&&r.ok&&r.time).map(({ok,...r})=>r)}
 const key=r=>[r.time,r.sym,r.side,r.q,r.p,r.st,r.oid].join('|');
-document.addEventListener('change',e=>{if(e.target.id=='imp'){importData(e.target.files[0]);e.target.value='';return}if(e.target.id!='f')return;const f=e.target.files[0];if(!f)return;
+document.addEventListener('change',e=>{if(e.target.id=='shot'){readShots(Array.from(e.target.files));e.target.value='';return}if(e.target.id=='imp'){importData(e.target.files[0]);e.target.value='';return}if(e.target.id!='f')return;const f=e.target.files[0];if(!f)return;
 const rd=new FileReader();rd.onload=()=>{const n=parse(rd.result);if(!n.length){msg='<span class="r">No orders found. Needs a CSV with Time, Type, Instrument, Qty. and Avg. price columns (or Console tradebook columns). First line: '+String(rd.result).split(/\r?\n/)[0].slice(0,150).replace(/</g,'&lt;')+'</span>';render();return}
 const have=new Set(rows.map(key));let add=0;n.forEach(r=>{if(!have.has(key(r))){rows.push(r);have.add(key(r));add++}});
 sv('zrows',rows);msg='Added '+add+' new orders, skipped '+(n.length-add)+' duplicates.';render()};rd.readAsText(f);e.target.value=''});
@@ -90,6 +90,23 @@ sv('zlast',Date.now());msg='Backup saved.'}catch(e){msg=e&&e.code=='declined'?'B
 function importData(f){if(!f)return;const rd=new FileReader();rd.onload=()=>{try{const o=JSON.parse(rd.result);if(!Array.isArray(o.rows))throw 0;const have=new Set(rows.map(key));let add=0;
 o.rows.forEach(r=>{if(r&&r.sym&&r.time&&!have.has(key(r))){rows.push(r);have.add(key(r));add++}});
 if(o.D)D=Object.assign(D,o.D);if(o.S)S=Object.assign(S,o.S);sv('zrows',rows);sv('zcfg3',D);sv('zset',S);msg='Imported: '+add+' new orders added, '+(o.rows.length-add)+' already present.'}catch(e){msg='That file is not a valid backup.'}render()};rd.readAsText(f)}
+function tod(a){if(!a.length)return'';const B={},f=s=>String(Math.floor(s/60)).padStart(2,'0')+':'+(s%60?'30':'00');
+a.forEach(t=>{const h=+t.et.slice(11,13),m=+t.et.slice(14,16);if(isNaN(h)||isNaN(m))return;const s=h*60+(m>=30?30:0);(B[s]||(B[s]=[])).push(t)});
+const xs={},ks=Object.keys(B).map(Number);if(!ks.length)return'';ks.forEach(s=>xs[s]=stats(B[s]));const mx=Math.max(...ks.map(s=>Math.abs(xs[s].net)),1),bt=ks.reduce((p,c)=>xs[c].net>xs[p].net?c:p),ws=ks.reduce((p,c)=>xs[c].net<xs[p].net?c:p),lo=Math.min(540,...ks),hi=Math.max(900,...ks),sh=n=>(n<0?'-':'+')+'₹'+(Math.abs(n)>=1000?(Math.abs(n)/1000).toFixed(1)+'k':Math.round(Math.abs(n)));
+let cells='',cnt=0;for(let s=lo;s<=hi;s+=30){cnt++;const x=xs[s],al=x?.25+.75*Math.abs(x.net)/mx:0;
+cells+='<div title="'+(x?f(s)+'–'+f(s+30)+': '+x.n+' trades, '+x.wr.toFixed(0)+'% win, net '+inr(x.net):'No trades')+'" style="flex:1;min-width:62px;text-align:center"><div style="height:64px;border-radius:6px;display:flex;flex-direction:column;justify-content:center;font-size:12px;color:var(--tx);background:'+(x?(x.net>=0?'rgba(34,170,100,'+al+')':'rgba(220,70,70,'+al+')'):'var(--bd)')+'">'+(x?'<b>'+sh(x.net)+'</b><span>'+x.n+(x.n>1?' trades':' trade')+'</span><span>'+x.wr.toFixed(0)+'% win</span>':'<span style="color:var(--mu)">–</span>')+'</div><div class="note">'+f(s)+'</div></div>'}
+return'<div class="card"><h2 style="margin-top:0">P&L by time of day</h2><div class="sc"><div style="display:flex;gap:4px;min-width:'+cnt*66+'px">'+cells+'</div></div>'+
+'<div class="note">Each block is a 30-minute slot, grouped by entry time, net of charges. Darker means a bigger result. Best slot: '+f(bt)+'–'+f(bt+30)+' ('+inr(xs[bt].net)+'). Worst slot: '+f(ws)+'–'+f(ws+30)+' ('+inr(xs[ws].net)+').'+(a.length<30?' With only '+a.length+' trades, treat this as a hint, not a pattern.':'')+'</div></div>'}
+let sd=new Date().toLocaleDateString('en-CA'),pend=null;
+async function readShots(imgs){if(!imgs.length)return;msg='Reading '+imgs.length+' screenshot(s)...';render();
+try{const sample=window.claude?await window.claude.use('sample'):null;if(!sample)throw{code:'unavailable'};
+const o=await sample.json(`These are screenshots of the order table in the Sahi trading app. Read every row (screenshots may overlap; list each order once). Reply with only a JSON array. For each row: t = time from the Last Updated column in 24-hour HH:MM:SS (use :00 for seconds if not shown), s = "buy" or "sell" from the B/S badge, i = the instrument text exactly as shown, q = the FIRST number of Filled Qty, p = Avg Price as a number, ty = order type. Skip rows with filled quantity 0, rejected or cancelled. Never guess: use null for anything unreadable. Example: [{"t":"11:33:56","s":"sell","i":"NIFTY 09 Nov 24550 Call","q":65,"p":198.8,"ty":"SL-Limit"}]`,{images:imgs,cache:false});
+const seen=new Set(),out=[];(Array.isArray(o)?o:[]).forEach(x=>{if(!x||!x.t||!x.i||!(x.q>0)||!(x.p>0)||!/^(buy|sell)$/i.test(x.s))return;
+const r={sym:String(x.i).trim().replace(/\s+Call$/i,' CE').replace(/\s+Put$/i,' PE'),seg:'',time:sd+' '+(String(x.t).length==5?x.t+':00':x.t),date:sd,side:x.s.toLowerCase(),q:+x.q,p:+x.p,st:'COMPLETE',pr:'MIS',oid:''};
+if(!seen.has(key(r))){seen.add(key(r));out.push(r)}});out.sort((a,b)=>a.time<b.time?-1:1);pend=out.length?out:null;msg=out.length?'':'No orders could be read from those screenshots.'}
+catch(e){const c=e&&e.code;msg=c=='not_granted'?'Permission to send screenshots to Claude was declined.':c=='unavailable'||c=='images_unavailable'?'Screenshot reading works only on the published page.':'Could not read the screenshots. Try again with fewer or clearer images.'}render()}
+function pendHtml(){if(!pend)return'';return'<div class="card"><h2 style="margin-top:0">Check before adding ('+sd+')</h2><div class="sc"><table><tr><th>Time</th><th>Side</th><th>Instrument</th><th>Qty</th><th>Price</th></tr>'+pend.map(r=>'<tr><td>'+r.time.slice(11)+'</td><td>'+r.side+'</td><td>'+r.sym+'</td><td>'+r.q+'</td><td>'+r.p+'</td></tr>').join('')+'</table></div><div class="note">Compare with your Sahi screen. Claude can misread numbers, so check the count, times, prices and buy/sell. Set the trade date before uploading.</div><p class="row"><button class="btn" onclick="addPend()">Add '+pend.length+' orders</button><button class="btn s" onclick="pend=null;render()">Discard</button></p></div>'}
+function addPend(){const have=new Set(rows.map(key));let add=0;pend.forEach(r=>{if(!have.has(key(r))){rows.push(r);have.add(key(r));add++}});sv('zrows',rows);msg='Added '+add+' new orders, skipped '+(pend.length-add)+' duplicates.';pend=null;render()}
 function go(v){view=v;msg='';render();window.scrollTo(0,0)}
 function perf(s){return'<div class="grid">'+k('Net P&L',inr(s.net),cl(s.net))+k('Gross P&L',inr(s.gross),cl(s.gross))+k('Brokerage',inr(s.brk))+k('All charges',inr(s.ch),'r')+k('Trades',s.n+' ('+s.W+'W / '+s.L+'L)')+k('Win rate',s.wr.toFixed(1)+'%')+k('Avg win',inr(s.aw),'g')+k('Avg loss',inr(s.al),'r')+k('Avg win : avg loss','1 : '+s.rr.toFixed(2),s.rr>=1?'g':'r')+k('Profit factor',s.pf.toFixed(2))+k('Expectancy / trade',inr(s.exp),cl(s.exp))+k('Max drawdown',inr(s.mdd),'r')+k('Max losing streak',s.mcs)+'</div>'}
 function render(){const v=document.getElementById('v');
@@ -99,13 +116,13 @@ if(view=='settings'){v.innerHTML='<div class="card"><h2 style="margin-top:0">Set
 '<div class="note">Brokerage = lower of cap and %, per executed order (options: flat cap, % = 0). GST applies to brokerage + exchange + SEBI. Changes save automatically.</div><p><button class="btn s" onclick="D=JSON.parse(JSON.stringify(D0));sv(\'zcfg3\',D);render()">Reset charges to defaults</button></p></div>'+
 '<div class="card"><h2 style="margin-top:0">Backup</h2><p class="note">'+rows.length+' orders stored in this browser only. '+(ld('zlast',0)?'Last backup: '+new Date(ld('zlast',0)).toLocaleDateString():'Never backed up.')+'</p><div class="row"><button class="btn" onclick="exportData()">Export backup</button><label class="btn s" for="imp">Import backup</label><input id="imp" type="file" accept=".json" style="display:none"></div><p class="note">'+msg+'</p></div><div class="card"><h2 style="margin-top:0">Delete data</h2><button class="btn s" onclick="if(confirm(\'Delete all stored orders?\')){rows=[];sv(\'zrows\',rows);go(\'home\')}">Delete all stored data</button></div>';return}
 const tr=calc(),days={};tr.forEach(t=>(days[t.date]||(days[t.date]=[])).push(t));
-const up='<div class="card row"><label class="btn" for="f">Upload today’s CSV</label><input id="f" type="file" accept=".csv" style="display:none"><span class="note" style="margin:0">'+(msg||'Each upload is merged by date; repeated orders are skipped. Data stays in this browser.')+'</span></div>';
+const up='<div class="card row"><label class="btn" for="f">Upload today’s CSV</label><input id="f" type="file" accept=".csv" style="display:none"><label class="btn s" for="shot">Upload Sahi screenshots</label><input id="shot" type="file" accept="image/*" multiple style="display:none"><label class="note" style="margin:0">Trade date <input type="date" id="sd" value="'+sd+'" oninput="sd=this.value"></label><span class="note" style="margin:0">'+(msg||'Each upload is merged by date; repeated orders are skipped. Data stays in this browser.')+'</span></div>';
 if(view!='home'&&days[view]){const a=days[view],s=stats(a);
 v.innerHTML='<p><button class="btn s" onclick="go(\'home\')">← All days</button></p><h2 style="margin-top:0">'+view+'</h2>'+perf(s)+'<div class="card" style="margin-top:12px"><h2 style="margin-top:0">Trades</h2><div class="sc"><table><tr><th>Entry time</th><th>Symbol</th><th>Dir</th><th>Qty</th><th>Entry</th><th>Exit</th><th>Gross</th><th>Charges</th><th>Net</th></tr>'+
 a.map(t=>'<tr><td>'+t.et.slice(11)+'</td><td>'+t.sym+'</td><td>'+t.bias+'</td><td>'+t.eq+'</td><td>'+t.entry.toFixed(2)+'</td><td>'+t.exit.toFixed(2)+'</td><td class="'+cl(t.gross)+'">'+inr(t.gross)+'</td><td>'+inr(t.ch)+'</td><td class="'+cl(t.net)+'">'+inr(t.net)+'</td></tr>').join('')+'</table></div>'+
-'<div class="note">CE = long, PE = short.</div></div>'+bias(a);return}
+'<div class="note">CE = long, PE = short.</div></div>'+bias(a)+tod(a);return}
 const s=stats(tr),dk=Object.keys(days).sort().reverse();
-v.innerHTML=up+(tr.length&&Date.now()-ld('zlast',0)>6048e5?'<div class="card note">No backup in the last 7 days. Go to Settings and tap Export backup.</div>':'')+(tr.length?'<h2 style="margin-top:0">Overall</h2>'+perf(s)+'<div class="card" style="margin-top:12px">'+chart(s.eq,s.dd)+'</div>'+bias(tr)+'<div class="card"><h2 style="margin-top:0">Days</h2><div class="sc"><table><tr><th>Date</th><th>Trades</th><th>Win %</th><th>Brokerage</th><th>All charges</th><th>Net P&L</th></tr>'+
+v.innerHTML=up+pendHtml()+(tr.length&&Date.now()-ld('zlast',0)>6048e5?'<div class="card note">No backup in the last 7 days. Go to Settings and tap Export backup.</div>':'')+(tr.length?'<h2 style="margin-top:0">Overall</h2>'+perf(s)+'<div class="card" style="margin-top:12px">'+chart(s.eq,s.dd)+'</div>'+bias(tr)+tod(tr)+'<div class="card"><h2 style="margin-top:0">Days</h2><div class="sc"><table><tr><th>Date</th><th>Trades</th><th>Win %</th><th>Brokerage</th><th>All charges</th><th>Net P&L</th></tr>'+
 dk.map(d=>{const x=stats(days[d]);return'<tr class="c" onclick="go(\''+d+'\')"><td>'+d+' ›</td><td>'+x.n+'</td><td>'+x.wr.toFixed(0)+'%</td><td>'+inr(x.brk)+'</td><td>'+inr(x.ch)+'</td><td class="'+cl(x.net)+'">'+inr(x.net)+'</td></tr>'}).join('')+'</table></div><div class="note">Tap a date to see every trade of that day.</div></div>':'<div class="card note">No trades yet. Upload your first CSV.</div>')}
 render();
 </script></body></html>
